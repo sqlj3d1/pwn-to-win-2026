@@ -1465,6 +1465,25 @@
     .closing-prompt .p-path { color: var(--red); }
     .closing-prompt .p-sep  { color: #222; }
 
+    .closing-qr {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.6rem;
+    }
+    .closing-qr img {
+      width: 180px;
+      border-radius: 8px;
+      border: 1px solid var(--blood);
+      box-shadow: 0 0 0 1px #1a0000, 0 6px 24px rgba(0,0,0,0.8);
+    }
+    .closing-qr-label {
+      font-size: var(--fs-xs);
+      color: #444;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+    }
+
     /* Left vertical accent */
     .closing-slide .closing-accent-l {
       position: absolute;
@@ -2188,20 +2207,13 @@
         <span class="red">THANK</span> YOU
       </h1>
 
-      <p class="closing-subtitle">questions? let's hack.</p>
+      <p class="closing-subtitle">any questions?</p>
 
       <hr class="closing-rule" />
 
-      <div class="closing-info-row">
-        <span class="closing-name">Harraz</span>
-        <div class="closing-sep"></div>
-        <span class="closing-handle">sqlj3d1</span>
-        <div class="closing-sep"></div>
-        <span class="closing-role">Offensive Security Intern · UUM</span>
-      </div>
-
-      <div class="closing-prompt">
-        <span class="p-host">sqlj3d1@kali</span><span class="p-sep">:</span><span class="p-path">~</span><span class="p-sep">$ </span><span class="cursor"></span>
+      <div class="closing-qr">
+        <img src="assets/lets-connect.png" alt="LinkedIn QR Code" />
+        <span class="closing-qr-label">let's connect</span>
       </div>
 
     </section>
