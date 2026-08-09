@@ -1,0 +1,2227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Pwn to Win: An Insider's Guide to CTF 2026</title>
+
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reset.css" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.css" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/theme/black.css" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/plugin/highlight/monokai.css" />
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;600;700&display=swap" rel="stylesheet" />
+
+  <style>
+    /* ══════════════════════════════════════
+       DESIGN TOKENS
+    ══════════════════════════════════════ */
+    :root {
+      --black:   #000000;
+      --offwhite:#E5E5E5;
+      --red:     #FF0000;
+      --crimson: #950101;
+      --blood:   #3D0000;
+
+      /* Type scale — 4 sizes only, all rem-based */
+      --fs-xs:   0.62rem;   /* labels, captions, meta      */
+      --fs-sm:   0.78rem;   /* body text, descriptions      */
+      --fs-md:   1.0rem;    /* sub-headings, handles        */
+      --fs-lg:   1.4rem;    /* slide main titles (./cmd)    */
+
+      /* Consistent padding */
+      --pad-x: 5rem;
+      --pad-y: 2.8rem;
+
+      /* Meme column width — shared */
+      --meme-col: 230px;
+    }
+
+    /* ══════════════════════════════════════
+       GLOBAL
+    ══════════════════════════════════════ */
+    *, *::before, *::after { box-sizing: border-box; }
+
+    .reveal-viewport, .reveal, .reveal .slides {
+      background: var(--black) !important;
+    }
+
+    .reveal .slides section {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 16px;          /* single root for all rem values */
+      color: var(--offwhite);
+      text-align: left;
+      height: 100%;
+      top: 0 !important;
+      padding: 0 !important;
+    }
+
+    /* CRT scanlines */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background: repeating-linear-gradient(
+        0deg, transparent 0px, transparent 2px,
+        rgba(0,0,0,0.12) 2px, rgba(0,0,0,0.12) 4px
+      );
+      pointer-events: none;
+      z-index: 9999;
+    }
+
+    /* Blinking cursor */
+    .cursor {
+      display: inline-block;
+      width: 0.55em; height: 1em;
+      background: var(--red);
+      vertical-align: text-bottom;
+      margin-left: 2px;
+      animation: blink 1s step-start infinite;
+      box-shadow: 0 0 6px rgba(255,0,0,0.7);
+    }
+    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+
+    /* Shared animations */
+    @keyframes border-pulse {
+      0%,100% { box-shadow: 0 0 0 1px var(--blood), 0 0 20px rgba(149,1,1,0.18); }
+      50%      { box-shadow: 0 0 0 1px var(--crimson), 0 0 40px rgba(149,1,1,0.45); }
+    }
+    @keyframes glitch {
+      0%,89%,100% { transform:translate(0); }
+      90%  { text-shadow:-3px 0 var(--red),3px 0 #00ffff; transform:translate(-2px,0); clip-path:inset(8% 0 82% 0); }
+      91%  { text-shadow:3px 0 var(--red),-3px 0 #00ffff; transform:translate(2px,0); clip-path:none; }
+      92%  { transform:translate(0); }
+      93%  { text-shadow:-2px 0 #00ffff,2px 0 var(--red); transform:translate(1px,-1px); clip-path:inset(55% 0 25% 0); }
+      94%  { transform:translate(0); clip-path:none; }
+    }
+
+    /* Shared terminal chrome */
+    .t-bar {
+      display: flex; align-items: center; gap: 7px;
+      background: #110000;
+      padding: 9px 16px;
+      border-bottom: 1px solid var(--blood);
+      flex-shrink: 0;
+    }
+    .dot { width: 12px; height: 12px; border-radius: 50%; }
+    .dot-r { background: #FF5F57; }
+    .dot-y { background: #FEBC2E; }
+    .dot-g { background: #28C840; }
+    .t-bar-label { font-size: var(--fs-xs); color: #333; margin-left: 8px; }
+
+    /* Shared dual-title pattern */
+    .slide-cmd {
+      font-size: var(--fs-lg);
+      font-weight: 700;
+      color: var(--red);
+      text-shadow: 0 0 14px rgba(255,0,0,0.4);
+      margin: 0;
+      line-height: 1.2;
+    }
+    .slide-sub {
+      font-size: var(--fs-xs);
+      color: #484848;
+      margin: 0;
+      line-height: 1.6;
+    }
+
+    /* Shared meme panel */
+    .meme-panel {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 0.7rem;
+      background: #030000;
+      border-left: 1px solid var(--blood);
+      padding: 2rem 1.4rem;
+    }
+    .meme-panel img {
+      width: 100%;
+      max-width: 190px;
+      border-radius: 6px;
+      border: 1px solid var(--blood);
+      box-shadow: 0 0 0 1px #1a0000, 0 8px 30px rgba(0,0,0,0.9), 0 0 18px rgba(149,1,1,0.2);
+      filter: grayscale(10%) contrast(1.06);
+    }
+    .meme-cap {
+      font-size: var(--fs-xs);
+      color: #2a2a2a;
+      text-align: center;
+      font-style: italic;
+      line-height: 1.6;
+    }
+
+    /* ══════════════════════════════════════
+       SLIDE 1 — OPENING
+    ══════════════════════════════════════ */
+    .opening-slide {
+      position: relative;
+      display: flex !important;
+      flex-direction: column;
+      align-items: flex-start;
+      justify-content: center;
+      padding: var(--pad-y) var(--pad-x) !important;
+      overflow: hidden;
+    }
+    .opening-slide::before {
+      content: '';
+      position: absolute;
+      left: 0; top: 8%; height: 84%; width: 4px;
+      background: linear-gradient(180deg, transparent, var(--red), var(--crimson), transparent);
+    }
+    .noise {
+      position: absolute; inset: 0;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E");
+      opacity: 0.02; pointer-events: none; z-index: 0;
+    }
+    .opening-slide > *:not(.noise) { position: relative; z-index: 1; }
+
+    .boot-lines {
+      font-size: var(--fs-xs);
+      color: #333; line-height: 1.8;
+      margin-bottom: 2rem; white-space: pre;
+    }
+    .boot-lines .ok   { color: var(--crimson); }
+    .boot-lines .warn { color: #550000; }
+
+    .t-box {
+      background: #080000;
+      border: 1px solid var(--crimson);
+      border-radius: 7px;
+      width: 100%; overflow: hidden;
+      animation: border-pulse 4s ease-in-out infinite;
+    }
+    .t-body {
+      padding: 1.8rem 2.2rem 2.2rem;
+      font-size: var(--fs-sm);
+      line-height: 2; color: #555;
+    }
+    .t-prompt-host { color: var(--crimson); }
+    .t-prompt-sep  { color: #2a2a2a; }
+    .t-prompt-path { color: var(--red); }
+    .t-prompt-cmd  { color: var(--offwhite); }
+
+    .op-big-title {
+      font-size: 3.8rem; font-weight: 700;
+      line-height: 1.05; margin: 0.7rem 0 0.3rem;
+      animation: glitch 7s infinite;
+    }
+    .op-big-title .pwn  { color: var(--red); text-shadow: 0 0 30px rgba(255,0,0,0.5); }
+    .op-big-title .rest { color: var(--offwhite); }
+
+    .op-subtitle { font-size: var(--fs-sm); color: #555; margin: 0 0 1.8rem; letter-spacing: 0.04em; }
+
+    .op-sep { width: 100%; height: 1px; background: linear-gradient(90deg, var(--blood), transparent); margin: 0 0 1.2rem; }
+
+    .op-meta { display: flex; flex-direction: column; gap: 0.4rem; }
+    .op-meta-row { display: flex; align-items: center; gap: 1.2rem; font-size: var(--fs-sm); }
+    .op-meta-key { color: var(--crimson); min-width: 72px; }
+    .op-meta-val { color: var(--offwhite); }
+    .op-meta-dim { color: #3a3a3a; }
+    .op-meta-red { color: var(--red); }
+
+    /* ══════════════════════════════════════
+       SLIDE 2 — WHOAMI
+    ══════════════════════════════════════ */
+    .whoami-slide {
+      position: relative;
+      display: grid !important;
+      grid-template-columns: 1fr var(--meme-col);
+      height: 100%; overflow: hidden;
+    }
+    .whoami-slide::before {
+      content: '';
+      position: absolute; inset: 0;
+      background: repeating-linear-gradient(
+        -55deg, transparent, transparent 38px,
+        rgba(149,1,1,0.03) 38px, rgba(149,1,1,0.03) 40px
+      );
+      pointer-events: none; z-index: 0;
+    }
+    .whoami-slide::after {
+      content: '_';
+      position: absolute; right: calc(var(--meme-col) - 0.05em); bottom: -0.25em;
+      font-size: 20rem; font-weight: 700;
+      color: var(--blood); opacity: 0.1;
+      line-height: 1; pointer-events: none; z-index: 0;
+    }
+
+    /* Title block — consistent spacing on every slide */
+    .slide-header { display: flex; flex-direction: column; gap: 0.3rem; margin-bottom: 1.6rem; }
+
+    .wh-left {
+      display: flex; flex-direction: column; justify-content: center;
+      padding: var(--pad-y) 3rem var(--pad-y) var(--pad-x);
+      position: relative; z-index: 1;
+    }
+    .wh-content { display: contents; }
+    .wh-identity { margin-bottom: 1.8rem; }
+    .wh-name-row {
+      display: flex; align-items: baseline; gap: 1rem;
+      border-bottom: 1px solid var(--blood);
+      padding-bottom: 0.8rem; margin-bottom: 0.8rem;
+    }
+    .wh-name { font-size: 3.6rem; font-weight: 700; color: var(--offwhite); line-height: 1; margin: 0; }
+    .wh-handle { font-size: var(--fs-md); color: var(--red); text-shadow: 0 0 12px rgba(255,0,0,0.4); margin: 0; align-self: flex-end; padding-bottom: 0.15rem; }
+    .wh-role { font-size: var(--fs-sm); color: #888; margin: 0 0 0.2rem; }
+    .wh-uni  { font-size: var(--fs-xs); color: #3a3a3a; letter-spacing: 0.04em; }
+
+    .wh-rule { width: 100%; height: 1px; background: linear-gradient(90deg, var(--blood), transparent); border: none; margin: 0 0 1.4rem; }
+
+    .wh-cred-label { font-size: var(--fs-xs); color: var(--crimson); letter-spacing: 0.22em; text-transform: uppercase; margin-bottom: 0.8rem; }
+    .wh-creds { display: flex; flex-direction: column; gap: 0.55rem; }
+    .wh-cred {
+      display: grid; grid-template-columns: 90px 1fr;
+      border-radius: 5px; overflow: hidden; border: 1px solid var(--blood);
+    }
+    .wh-pill {
+      font-size: var(--fs-xs); font-weight: 700; color: var(--offwhite);
+      background: var(--blood); padding: 0.65em 0.7em;
+      letter-spacing: 0.07em; text-align: center; white-space: nowrap;
+      border-right: 1px solid var(--crimson);
+    }
+    .wh-pill.gold   { background: #4a3300; color: #f5c842; border-right-color: #7a5900; }
+    .wh-pill.silver { background: #1e2a2a; color: #aac8c8; border-right-color: #2d4040; }
+    .wh-cred-text { font-size: var(--fs-sm); color: var(--offwhite); padding: 0.65em 1em; background: rgba(61,0,0,0.18); line-height: 1.3; }
+
+    /* ══════════════════════════════════════
+       SLIDE 3 — HOOK / WHAT IS CTF
+    ══════════════════════════════════════ */
+    .hook-slide {
+      position: relative;
+      display: grid !important;
+      grid-template-columns: 1fr var(--meme-col);
+      height: 100%; overflow: hidden;
+    }
+    .hook-slide::before {
+      content: '';
+      position: absolute; bottom: -10%; right: var(--meme-col);
+      width: 50%; height: 70%;
+      background: radial-gradient(ellipse, rgba(149,1,1,0.13) 0%, transparent 70%);
+      pointer-events: none; z-index: 0;
+    }
+
+    .hk-left {
+      display: flex; flex-direction: column; justify-content: center;
+      padding: var(--pad-y) 3rem var(--pad-y) var(--pad-x);
+      gap: 1.4rem;
+      position: relative; z-index: 1;
+    }
+    .hk-content { display: contents; }
+
+    /* CTF acronym */
+    .hk-acronym { display: flex; align-items: center; gap: 0.8rem; }
+    .hk-letter-card {
+      display: flex; flex-direction: column; align-items: center;
+      background: rgba(61,0,0,0.25); border: 1px solid var(--blood);
+      border-radius: 6px; padding: 0.6rem 1.2rem; min-width: 76px;
+    }
+    .hk-letter { font-size: 2.2rem; font-weight: 700; color: var(--red); text-shadow: 0 0 14px rgba(255,0,0,0.5); line-height: 1; }
+    .hk-letter-word { font-size: var(--fs-xs); color: #666; letter-spacing: 0.1em; text-transform: uppercase; margin-top: 0.2rem; }
+    .hk-letter-sep { font-size: var(--fs-md); color: var(--blood); }
+
+    /* Definition */
+    .hk-definition {
+      border-left: 3px solid var(--crimson);
+      padding: 0.8rem 1.1rem;
+      background: rgba(61,0,0,0.15);
+      border-radius: 0 4px 4px 0;
+    }
+    .hk-def-label { font-size: var(--fs-xs); color: var(--crimson); letter-spacing: 0.2em; text-transform: uppercase; margin-bottom: 0.35rem; }
+    .hk-def-text  { font-size: var(--fs-sm); color: var(--offwhite); line-height: 1.65; margin: 0; }
+    .hk-def-text em { color: var(--red); font-style: normal; font-weight: 700; }
+
+    /* Flag section */
+    .hk-flag-section { display: flex; flex-direction: column; gap: 0.5rem; }
+    .hk-flag-label { font-size: var(--fs-xs); color: var(--crimson); letter-spacing: 0.2em; text-transform: uppercase; }
+
+    .hk-flags-row { display: flex; align-items: flex-start; gap: 1rem; }
+    .hk-flag-col  { display: flex; flex-direction: column; gap: 0.4rem; flex: 1; }
+    .hk-flag-col-label { font-size: var(--fs-xs); color: #444; letter-spacing: 0.15em; text-transform: uppercase; }
+    .hk-flag-divider { font-size: var(--fs-xs); color: var(--blood); align-self: center; margin-top: 1.4rem; }
+
+    .hk-flag-box {
+      display: inline-flex; align-items: stretch;
+      border: 1px solid var(--crimson); border-radius: 4px;
+      overflow: hidden; font-size: var(--fs-sm); font-weight: 700; width: fit-content;
+    }
+    .hk-flag-header { background: var(--crimson); color: var(--offwhite); padding: 0.4em 0.75em; }
+    .hk-flag-brace  { background: #1a0000; color: var(--crimson); padding: 0.4em 0.2em; }
+    .hk-flag-body   { background: #0d0000; color: var(--red); padding: 0.4em 0.65em; text-shadow: 0 0 8px rgba(255,0,0,0.4); }
+    .hk-flag-close  { background: #1a0000; color: var(--crimson); padding: 0.4em 0.45em 0.4em 0.15em; }
+
+    .hk-flag-box-example .hk-flag-header { background: var(--blood); color: #888; }
+    .hk-flag-box-example .hk-flag-body   { color: #b30000; text-shadow: none; }
+
+    .hk-flag-ann-row { display: flex; flex-direction: column; gap: 0.28rem; }
+    .hk-ann-item { display: flex; align-items: center; gap: 0.45rem; font-size: var(--fs-xs); color: #555; }
+    .hk-ann-tick { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+    .hk-ann-item:first-child .hk-ann-tick      { background: var(--crimson); }
+    .hk-ann-item.hk-ann-body-item .hk-ann-tick { background: var(--red); box-shadow: 0 0 5px rgba(255,0,0,0.5); }
+    .hk-flag-ann-row em { color: var(--offwhite); font-style: normal; }
+
+    /* ══════════════════════════════════════
+       SLIDE 4 — FORMATS
+    ══════════════════════════════════════ */
+    .formats-slide {
+      position: relative;
+      display: flex !important;
+      flex-direction: column;
+      justify-content: center;
+      padding: var(--pad-y) var(--pad-x) !important;
+      overflow: visible;
+    }
+    .formats-slide::before {
+      content: '';
+      position: absolute; inset: 0;
+      background: repeating-linear-gradient(
+        -55deg, transparent, transparent 38px,
+        rgba(149,1,1,0.03) 38px, rgba(149,1,1,0.03) 40px
+      );
+      pointer-events: none; z-index: 0;
+    }
+    .formats-slide > * { position: relative; z-index: 1; }
+
+    /* Horizontal format strip */
+    .fmt-strip {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0;
+      width: 100%;
+      margin-top: 1rem;
+      overflow: visible;
+    }
+
+    /* Connector line between diamonds */
+    .fmt-line {
+      width: 40px;
+      height: 2px;
+      background: linear-gradient(90deg, var(--blood), var(--crimson));
+      flex-shrink: 0;
+    }
+
+    /* Each format item: diamond icon + text below */
+    .fmt-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 1rem;
+      flex: 1;
+      max-width: 240px;
+      overflow: visible;
+    }
+
+    /* Diamond shape */
+    .fmt-diamond {
+      width: 70px;
+      height: 70px;
+      transform: rotate(45deg);
+      border: 2px solid var(--blood);
+      background: rgba(61,0,0,0.25);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .fmt-diamond-inner {
+      transform: rotate(-45deg);
+      font-size: 1.3rem;
+      text-align: center;
+    }
+
+    .fmt-item.highlight .fmt-diamond {
+      border-color: var(--crimson);
+      background: rgba(149,1,1,0.3);
+      box-shadow: 0 0 0 3px rgba(149,1,1,0.15), 0 0 25px rgba(255,0,0,0.2);
+    }
+
+    /* Text block below diamond */
+    .fmt-text {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      gap: 0.3rem;
+    }
+
+    .fmt-badge {
+      font-size: 0.5rem;
+      font-weight: 700;
+      color: var(--black);
+      background: var(--red);
+      padding: 0.15em 0.5em;
+      border-radius: 3px;
+      letter-spacing: 0.06em;
+    }
+
+    .fmt-name {
+      font-size: var(--fs-sm);
+      font-weight: 700;
+      color: #555;
+      line-height: 1.2;
+    }
+    .fmt-item.highlight .fmt-name {
+      color: var(--red);
+      text-shadow: 0 0 10px rgba(255,0,0,0.35);
+    }
+
+    .fmt-desc {
+      font-size: var(--fs-xs);
+      color: #444;
+      line-height: 1.5;
+      max-width: 200px;
+    }
+    .fmt-item.highlight .fmt-desc { color: #666; }
+    /* ══════════════════════════════════════
+       SLIDE 5 — CATEGORIES
+    ══════════════════════════════════════ */
+    .categories-slide {
+      position: relative;
+      display: flex !important;
+      flex-direction: column;
+      justify-content: center;
+      padding: var(--pad-y) var(--pad-x) !important;
+      overflow: hidden;
+    }
+    .categories-slide::before {
+      content: '';
+      position: absolute; inset: 0;
+      background: repeating-linear-gradient(
+        -55deg, transparent, transparent 38px,
+        rgba(149,1,1,0.03) 38px, rgba(149,1,1,0.03) 40px
+      );
+      pointer-events: none; z-index: 0;
+    }
+    .categories-slide > * { position: relative; z-index: 1; }
+
+    .cat-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 0.7rem;
+      width: 100%;
+    }
+
+    .cat-card {
+      display: flex;
+      flex-direction: column;
+      gap: 0.35rem;
+      border: 1px solid var(--blood);
+      border-radius: 6px;
+      padding: 0.75rem 1rem;
+      background: rgba(61,0,0,0.08);
+    }
+
+    .cat-card.new-cat {
+      border-color: var(--crimson);
+      background: rgba(149,1,1,0.1);
+      box-shadow: 0 0 0 1px var(--blood), 0 0 14px rgba(149,1,1,0.15);
+    }
+
+    .cat-name {
+      font-size: var(--fs-sm);
+      font-weight: 700;
+      color: var(--offwhite);
+      line-height: 1.2;
+      margin: 0;
+    }
+
+    .cat-card.new-cat .cat-name { color: var(--red); }
+
+    .cat-new-badge {
+      display: inline-block;
+      font-size: 0.5rem;
+      font-weight: 700;
+      color: var(--black);
+      background: var(--red);
+      padding: 0.1em 0.5em;
+      border-radius: 2px;
+      letter-spacing: 0.08em;
+      align-self: flex-start;
+    }
+
+    .cat-desc {
+      font-size: var(--fs-xs);
+      color: #555;
+      line-height: 1.5;
+      margin: 0;
+    }
+    /* ══════════════════════════════════════
+       SLIDE 6 — SCORING
+    ══════════════════════════════════════ */
+    .scoring-slide {
+      position: relative;
+      display: grid !important;
+      grid-template-columns: 1fr var(--meme-col);
+      height: 100%;
+      overflow: hidden;
+    }
+    .scoring-slide::before {
+      content: '';
+      position: absolute; inset: 0;
+      background: repeating-linear-gradient(
+        -55deg, transparent, transparent 38px,
+        rgba(149,1,1,0.03) 38px, rgba(149,1,1,0.03) 40px
+      );
+      pointer-events: none; z-index: 0;
+    }
+
+    .sc-left {
+      display: flex; flex-direction: column; justify-content: center;
+      padding: var(--pad-y) 3rem var(--pad-y) var(--pad-x);
+      position: relative; z-index: 1;
+    }
+
+    .sc-cards {
+      display: flex;
+      flex-direction: column;
+      gap: 0.9rem;
+    }
+
+    .sc-card {
+      display: grid;
+      grid-template-columns: 36px 1fr;
+      gap: 0 1rem;
+      align-items: start;
+      border: 1px solid var(--blood);
+      border-radius: 6px;
+      padding: 0.9rem 1.1rem;
+      background: rgba(61,0,0,0.08);
+    }
+
+    .sc-card.highlight {
+      border-color: var(--crimson);
+      background: rgba(149,1,1,0.1);
+      box-shadow: 0 0 0 1px var(--blood), 0 0 16px rgba(149,1,1,0.18);
+    }
+
+    .sc-icon {
+      font-size: 1.3rem;
+      line-height: 1;
+      padding-top: 0.1rem;
+    }
+
+    .sc-body { display: flex; flex-direction: column; gap: 0.3rem; }
+
+    .sc-title {
+      font-size: var(--fs-sm);
+      font-weight: 700;
+      color: #777;
+      margin: 0;
+      letter-spacing: 0.03em;
+    }
+    .sc-card.highlight .sc-title { color: var(--red); text-shadow: 0 0 8px rgba(255,0,0,0.3); }
+
+    .sc-desc {
+      font-size: var(--fs-xs);
+      color: #555;
+      line-height: 1.65;
+      margin: 0;
+    }
+    .sc-card.highlight .sc-desc { color: #777; }
+
+    /* Right panel — decay diagram */
+    .sc-right {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem 1.8rem;
+      background: #030000;
+      border-left: 1px solid var(--blood);
+      gap: 1rem;
+      position: relative; z-index: 1;
+    }
+
+    .sc-diagram-label {
+      font-size: var(--fs-xs);
+      color: var(--crimson);
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      text-align: center;
+    }
+
+    /* Decay bar chart */
+    .sc-decay-chart {
+      display: flex;
+      align-items: flex-end;
+      gap: 0.4rem;
+      height: 110px;
+      width: 100%;
+    }
+
+    .sc-bar-group {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.3rem;
+      flex: 1;
+    }
+
+    .sc-bar {
+      width: 100%;
+      background: linear-gradient(180deg, var(--crimson), var(--blood));
+      border-radius: 3px 3px 0 0;
+      border: 1px solid var(--crimson);
+    }
+
+    .sc-bar-label {
+      font-size: 0.5rem;
+      color: #444;
+      text-align: center;
+      letter-spacing: 0.05em;
+      white-space: nowrap;
+    }
+
+    .sc-decay-note {
+      font-size: var(--fs-xs);
+      color: #333;
+      text-align: center;
+      line-height: 1.5;
+      font-style: italic;
+    }
+
+    /* First blood callout */
+    .sc-firstblood {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      border: 1px solid var(--blood);
+      border-radius: 4px;
+      padding: 0.5rem 0.8rem;
+      background: rgba(61,0,0,0.15);
+      width: 100%;
+    }
+    .sc-fb-icon { font-size: 1rem; flex-shrink: 0; }
+    .sc-fb-text { font-size: var(--fs-xs); color: #555; line-height: 1.5; }
+    .sc-fb-text strong { color: var(--red); font-weight: 700; }
+    /* ══════════════════════════════════════
+       SLIDE 7 — REALITY CHECK / CAREER ROADMAP
+    ══════════════════════════════════════ */
+    .reality-slide {
+      position: relative;
+      display: flex !important;
+      flex-direction: column;
+      justify-content: center;
+      padding: var(--pad-y) var(--pad-x) !important;
+      overflow: hidden;
+    }
+    .reality-slide::before {
+      content: '';
+      position: absolute; inset: 0;
+      background:
+        radial-gradient(ellipse 55% 40% at 15% 75%, rgba(149,1,1,0.09) 0%, transparent 70%),
+        radial-gradient(ellipse 45% 35% at 88% 30%, rgba(255,0,0,0.07) 0%, transparent 65%);
+      pointer-events: none; z-index: 0;
+    }
+    .reality-slide > * { position: relative; z-index: 1; }
+
+    .roadmap-canvas {
+      position: relative;
+      width: 100%;
+      height: 26rem;
+      margin-top: 0.4rem;
+      overflow: visible;
+    }
+
+    .roadmap-svg {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      overflow: visible;
+    }
+
+    .roadmap-track {
+      fill: none;
+      stroke: url(#roadGrad);
+      stroke-width: 2.5;
+      stroke-linecap: round;
+      stroke-dasharray: 10 7;
+      opacity: 0.55;
+    }
+
+    .roadmap-glow {
+      fill: none;
+      stroke: var(--crimson);
+      stroke-width: 8;
+      stroke-linecap: round;
+      opacity: 0.08;
+      filter: blur(4px);
+    }
+
+    @keyframes road-march {
+      to { stroke-dashoffset: -34; }
+    }
+    .roadmap-track-anim {
+      stroke-dasharray: 10 7;
+      animation: road-march 2.4s linear infinite;
+    }
+
+    .roadmap-stop {
+      position: absolute;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      transform: translate(-50%, -50%);
+      text-align: center;
+      gap: 0.55rem;
+      width: 10.5rem;
+    }
+
+    .roadmap-stop--below { flex-direction: column; }
+    .roadmap-stop--above { flex-direction: column-reverse; }
+
+    .rm-node {
+      position: relative;
+      width: 3.4rem;
+      height: 3.4rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .rm-hex {
+      position: absolute;
+      inset: 0;
+      clip-path: polygon(50% 0%, 93% 25%, 93% 75%, 50% 100%, 7% 75%, 7% 25%);
+      background: radial-gradient(circle at 35% 30%, rgba(149,1,1,0.35), rgba(61,0,0,0.85));
+      border: none;
+      box-shadow: 0 0 0 1px var(--blood), 0 0 18px rgba(149,1,1,0.25);
+    }
+
+    .rm-step {
+      position: relative;
+      z-index: 1;
+      font-size: var(--fs-xs);
+      font-weight: 700;
+      color: var(--offwhite);
+      letter-spacing: 0.06em;
+    }
+
+    .rm-ring {
+      position: absolute;
+      inset: -5px;
+      clip-path: polygon(50% 0%, 93% 25%, 93% 75%, 50% 100%, 7% 75%, 7% 25%);
+      border: 1px solid var(--crimson);
+      opacity: 0.45;
+    }
+
+    .rm-label { display: flex; flex-direction: column; gap: 0.15rem; }
+
+    .rm-title {
+      font-size: var(--fs-xs);
+      font-weight: 700;
+      color: var(--offwhite);
+      line-height: 1.25;
+    }
+
+    .rm-desc {
+      font-size: 0.52rem;
+      color: #555;
+      line-height: 1.45;
+      letter-spacing: 0.02em;
+    }
+
+    /* Destination — flag beacon, not a hex */
+    .roadmap-stop--dest { width: 11rem; }
+
+    .rm-beacon {
+      position: relative;
+      width: 3.8rem;
+      height: 3.8rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .rm-beacon-pulse {
+      position: absolute;
+      inset: -6px;
+      border-radius: 50%;
+      border: 1px solid var(--red);
+      animation: beacon-pulse 2.8s ease-out infinite;
+    }
+    .rm-beacon-pulse:nth-child(2) { animation-delay: 1.4s; }
+
+    @keyframes beacon-pulse {
+      0%   { transform: scale(0.85); opacity: 0.7; }
+      100% { transform: scale(1.55); opacity: 0; }
+    }
+
+    .rm-beacon-core {
+      width: 3rem;
+      height: 3rem;
+      border-radius: 50%;
+      background: radial-gradient(circle at 35% 30%, var(--red), #5a0000);
+      box-shadow: 0 0 0 2px var(--crimson), 0 0 28px rgba(255,0,0,0.55);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.15rem;
+    }
+
+    .roadmap-stop--dest .rm-title {
+      color: var(--red);
+      text-shadow: 0 0 10px rgba(255,0,0,0.35);
+    }
+    .roadmap-stop--dest .rm-desc { color: #777; }
+
+    .roadmap-stop--1 { left: 10%;  top: 68%; }
+    .roadmap-stop--2 { left: 26%;  top: 28%; }
+    .roadmap-stop--3 { left: 42%;  top: 72%; }
+    .roadmap-stop--4 { left: 58%;  top: 26%; }
+    .roadmap-stop--5 { left: 74%;  top: 68%; }
+    .roadmap-stop--6 { left: 90%;  top: 38%; }
+
+    .roadmap-legend {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 2rem;
+      margin-top: 0.6rem;
+      font-size: 0.52rem;
+      color: #333;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+    .roadmap-legend span {
+      display: flex;
+      align-items: center;
+      gap: 0.45rem;
+    }
+    .rm-legend-dot {
+      width: 8px; height: 8px;
+      clip-path: polygon(50% 0%, 93% 25%, 93% 75%, 50% 100%, 7% 75%, 7% 25%);
+      background: var(--crimson);
+    }
+    .rm-legend-flag {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: var(--red);
+      box-shadow: 0 0 6px rgba(255,0,0,0.6);
+    }
+
+    /* ══════════════════════════════════════
+       SLIDE — LEVEL UP
+    ══════════════════════════════════════ */
+    .levelup-slide {
+      position: relative;
+      display: flex !important;
+      flex-direction: column;
+      justify-content: center;
+      align-items: flex-start;
+      padding: var(--pad-y) var(--pad-x) !important;
+      overflow: visible;
+    }
+    .levelup-slide::before {
+      content: '';
+      position: absolute; inset: 0;
+      background: radial-gradient(ellipse 55% 50% at 50% 60%, rgba(149,1,1,0.07) 0%, transparent 70%);
+      pointer-events: none; z-index: 0;
+    }
+    .levelup-slide > * { position: relative; z-index: 1; }
+
+    /* Horizontal node strip */
+    .lu-strip {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      width: 100%;
+      gap: 0;
+      position: relative;
+      padding-top: 3.5rem;
+    }
+
+    /* Connecting line behind nodes */
+    .lu-strip::before {
+      content: '';
+      position: absolute;
+      top: calc(3.5rem + 30px);
+      left: 30px; right: 30px;
+      height: 2px;
+      background: linear-gradient(90deg, var(--blood), var(--crimson), var(--blood));
+      z-index: 0;
+    }
+
+    .lu-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      flex: 1;
+      gap: 0.8rem;
+      position: relative;
+      z-index: 1;
+    }
+
+    /* Circle node */
+    .lu-circle {
+      width: 60px; height: 60px;
+      border-radius: 50%;
+      background: rgba(61,0,0,0.4);
+      border: 2px solid var(--crimson);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.5rem;
+      box-shadow: 0 0 0 4px rgba(149,1,1,0.08), 0 0 16px rgba(149,1,1,0.2);
+      flex-shrink: 0;
+    }
+
+    .lu-text {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.3rem;
+      max-width: 190px;
+    }
+
+    .lu-title {
+      font-size: var(--fs-sm);
+      font-weight: 700;
+      color: var(--red);
+      line-height: 1.25;
+      text-shadow: 0 0 8px rgba(255,0,0,0.3);
+    }
+
+    .lu-desc {
+      font-size: var(--fs-xs);
+      color: #555;
+      line-height: 1.6;
+    }
+    /* ══════════════════════════════════════
+       SLIDE — DEMO TIME
+    ══════════════════════════════════════ */
+    .demo-slide {
+      position: relative;
+      display: flex !important;
+      flex-direction: column;
+      justify-content: center;
+      align-items: flex-start;
+      padding: var(--pad-y) var(--pad-x) !important;
+      overflow: visible;
+    }
+    .demo-slide::before {
+      content: '';
+      position: absolute; inset: 0;
+      background: radial-gradient(ellipse 50% 45% at 50% 55%, rgba(149,1,1,0.09) 0%, transparent 70%);
+      pointer-events: none; z-index: 0;
+    }
+    .demo-slide > * { position: relative; z-index: 1; }
+
+    .demo-card {
+      width: 100%;
+      border: 1px solid var(--crimson);
+      border-radius: 8px;
+      background: rgba(61,0,0,0.12);
+      overflow: hidden;
+      box-shadow: 0 0 0 1px var(--blood), 0 0 30px rgba(149,1,1,0.15);
+    }
+
+    .demo-card-header {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      padding: 1rem 1.5rem;
+      background: rgba(149,1,1,0.12);
+      border-bottom: 1px solid var(--blood);
+    }
+
+    .demo-cat-badge {
+      font-size: var(--fs-xs);
+      font-weight: 700;
+      color: var(--black);
+      background: var(--red);
+      padding: 0.2em 0.7em;
+      border-radius: 3px;
+      letter-spacing: 0.06em;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+
+    .demo-chall-name {
+      font-size: 1.6rem;
+      font-weight: 700;
+      color: var(--offwhite);
+      margin: 0;
+    }
+
+    .demo-card-body {
+      padding: 1.5rem 1.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1.2rem;
+    }
+
+    .demo-field {
+      display: flex;
+      flex-direction: column;
+      gap: 0.3rem;
+    }
+
+    .demo-field-label {
+      font-size: var(--fs-xs);
+      color: var(--crimson);
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+    }
+
+    .demo-field-value {
+      font-size: var(--fs-sm);
+      color: var(--offwhite);
+      line-height: 1.6;
+    }
+
+    .demo-field-value.tba {
+      color: #444;
+      font-style: italic;
+    }
+
+    .demo-field-value a {
+      color: var(--red);
+      text-decoration: none;
+      border-bottom: 1px dashed var(--crimson);
+    }
+    .demo-field-value a:hover { border-bottom-style: solid; }
+
+    /* Hype banner */
+    .demo-hype {
+      display: flex;
+      align-items: center;
+      gap: 0.8rem;
+      margin-bottom: 1.2rem;
+    }
+
+    .demo-hype-icon {
+      font-size: 2.4rem;
+      animation: skull-pulse 2s ease-in-out infinite;
+    }
+
+    @keyframes skull-pulse {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.15); }
+    }
+
+    .demo-hype-text {
+      font-size: 2.2rem;
+      font-weight: 700;
+      color: var(--red);
+      letter-spacing: 0.15em;
+      text-shadow: 0 0 20px rgba(255,0,0,0.6), 0 0 60px rgba(255,0,0,0.25);
+      animation: glitch 5s infinite;
+    }
+
+    /* Footer line */
+    .demo-footer {
+      display: flex;
+      align-items: center;
+      gap: 0.7rem;
+      margin-top: 1.4rem;
+    }
+
+    .demo-pulse {
+      width: 10px; height: 10px;
+      border-radius: 50%;
+      background: var(--red);
+      box-shadow: 0 0 0 0 rgba(255,0,0,0.7);
+      animation: live-pulse 1.5s infinite;
+    }
+
+    @keyframes live-pulse {
+      0%   { box-shadow: 0 0 0 0 rgba(255,0,0,0.7); }
+      70%  { box-shadow: 0 0 0 12px rgba(255,0,0,0); }
+      100% { box-shadow: 0 0 0 0 rgba(255,0,0,0); }
+    }
+
+    .demo-footer-text {
+      font-size: var(--fs-xs);
+      color: #444;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+    }
+
+    /* ══════════════════════════════════════
+       SLIDE — WHERE TO START
+    ══════════════════════════════════════ */
+    .platforms-slide {
+      position: relative;
+      display: flex !important;
+      flex-direction: column;
+      align-items: flex-start;
+      justify-content: center;
+      padding: var(--pad-y) var(--pad-x) !important;
+      overflow: hidden;
+      gap: 1rem;
+    }
+
+    .platforms-slide::before {
+      content: '';
+      position: absolute; inset: 0;
+      background: repeating-linear-gradient(
+        -55deg, transparent, transparent 38px,
+        rgba(149,1,1,0.03) 38px, rgba(149,1,1,0.03) 40px
+      );
+      pointer-events: none; z-index: 0;
+    }
+    .platforms-slide > * { position: relative; z-index: 1; }
+
+    /* 3-col platform grid */
+    .platform-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 0.7rem;
+      width: 100%;
+    }
+
+    .platform-card {
+      display: flex;
+      align-items: center;
+      gap: 0.8rem;
+      border: 1px solid var(--blood);
+      border-radius: 6px;
+      padding: 0.75rem 1rem;
+      background: rgba(61,0,0,0.08);
+      text-decoration: none;
+    }
+
+    .platform-icon {
+      font-size: 1.3rem;
+      flex-shrink: 0;
+    }
+
+    .platform-info { display: flex; flex-direction: column; gap: 0.15rem; }
+    .platform-name { font-size: var(--fs-sm); font-weight: 700; color: var(--offwhite); }
+    .platform-url  { font-size: var(--fs-xs); color: #444; letter-spacing: 0.03em; }
+
+    /* Platforms left column */
+    .platforms-left {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+      flex: 1;
+    }
+
+    /* Platforms bottom row: CTFtime + meme side by side */
+    .platforms-bottom {
+      display: flex;
+      align-items: center;
+      gap: 1.2rem;
+      width: 100%;
+    }
+
+    .platforms-bottom .ctftime-card { flex: 1; }
+
+    /* Platforms meme */
+    .platforms-meme {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      flex-shrink: 0;
+    }
+    .platforms-meme img {
+      width: 180px;
+      border-radius: 6px;
+      border: 1px solid var(--blood);
+      box-shadow: 0 0 0 1px #1a0000, 0 6px 24px rgba(0,0,0,0.8), 0 0 14px rgba(149,1,1,0.15);
+    }
+
+    /* CTFtime special card — full width */
+    .ctftime-card {
+      display: flex;
+      align-items: center;
+      gap: 1.2rem;
+      border: 1px solid var(--crimson);
+      border-radius: 6px;
+      padding: 1.1rem 1.4rem;
+      background: rgba(149,1,1,0.1);
+      box-shadow: 0 0 0 1px var(--blood), 0 0 16px rgba(149,1,1,0.12);
+    }
+    .ctftime-icon { font-size: 1.6rem; flex-shrink: 0; }
+    .ctftime-info { display: flex; flex-direction: column; gap: 0.2rem; flex: 1; }
+    .ctftime-name { font-size: var(--fs-md); font-weight: 700; color: var(--red); text-shadow: 0 0 8px rgba(255,0,0,0.3); }
+    .ctftime-url  { font-size: var(--fs-xs); color: #444; }
+    .ctftime-desc { font-size: var(--fs-xs); color: #666; line-height: 1.5; }
+    .ctftime-badge {
+      font-size: var(--fs-xs);
+      font-weight: 700;
+      color: var(--black);
+      background: var(--red);
+      padding: 0.2em 0.6em;
+      border-radius: 3px;
+      letter-spacing: 0.06em;
+      flex-shrink: 0;
+      align-self: center;
+    }
+    /* ══════════════════════════════════════
+       SLIDE — INDUSTRY READINESS
+    ══════════════════════════════════════ */
+    .industry-slide {
+      position: relative;
+      display: flex !important;
+      flex-direction: column;
+      justify-content: center;
+      align-items: flex-start;
+      padding: var(--pad-y) var(--pad-x) !important;
+      overflow: visible;
+    }
+    .industry-slide::before {
+      content: '';
+      position: absolute; inset: 0;
+      background: repeating-linear-gradient(
+        -55deg, transparent, transparent 38px,
+        rgba(149,1,1,0.03) 38px, rgba(149,1,1,0.03) 40px
+      );
+      pointer-events: none; z-index: 0;
+    }
+    .industry-slide > * { position: relative; z-index: 1; }
+
+    /* Stacked bars */
+    .ind-stack {
+      display: flex;
+      flex-direction: column;
+      gap: 0.8rem;
+      width: 100%;
+    }
+
+    .ind-bar {
+      display: grid;
+      grid-template-columns: 50px 1fr;
+      align-items: stretch;
+      border-radius: 6px;
+      overflow: hidden;
+      border: 1px solid var(--blood);
+      background: rgba(61,0,0,0.08);
+    }
+
+    .ind-bar-num {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1rem;
+      font-weight: 700;
+      color: var(--offwhite);
+      background: var(--blood);
+      border-right: 1px solid var(--crimson);
+    }
+
+    .ind-bar-content {
+      padding: 0.9rem 1.3rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+    }
+
+    .ind-bar-title {
+      font-size: var(--fs-sm);
+      font-weight: 700;
+      color: var(--offwhite);
+      margin: 0;
+    }
+
+    .ind-bar-desc {
+      font-size: var(--fs-xs);
+      color: #555;
+      line-height: 1.6;
+      margin: 0;
+    }
+
+    .ind-bar-desc em {
+      color: #777;
+      font-style: normal;
+      font-size: 0.58rem;
+    }
+
+    .ind-meme {
+      margin-top: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+    .ind-meme img {
+      max-width: 200px;
+      border-radius: 6px;
+      border: 1px solid var(--blood);
+      box-shadow: 0 0 0 1px #1a0000, 0 6px 24px rgba(0,0,0,0.8), 0 0 16px rgba(149,1,1,0.15);
+      filter: grayscale(10%) contrast(1.05);
+    }
+
+    /* Industry slide layout grid */
+    .ind-layout {
+      display: grid;
+      grid-template-columns: 1fr 220px;
+      gap: 2rem;
+      width: 100%;
+      align-items: center;
+    }
+    /* ══════════════════════════════════════
+       SLIDE — THANK YOU / CLOSING
+    ══════════════════════════════════════ */
+    .closing-slide {
+      position: relative;
+      display: flex !important;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 3rem 5rem !important;
+      overflow: hidden;
+      height: 100%;
+      gap: 1.5rem;
+    }
+
+    .closing-slide::before {
+      content: '';
+      position: absolute; inset: 0;
+      background:
+        radial-gradient(ellipse 60% 55% at 50% 50%, rgba(255,0,0,0.08) 0%, transparent 60%);
+      pointer-events: none; z-index: 0;
+    }
+
+    .closing-slide .noise {
+      position: absolute; inset: 0;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E");
+      opacity: 0.025; pointer-events: none; z-index: 0;
+    }
+
+    .closing-slide > *:not(.noise) { position: relative; z-index: 1; }
+
+    /* Big title */
+    .closing-title {
+      font-size: 6rem;
+      font-weight: 700;
+      color: var(--offwhite);
+      line-height: 1;
+      margin: 0;
+      animation: glitch 6s infinite;
+    }
+    .closing-title .red {
+      color: var(--red);
+      text-shadow: 0 0 50px rgba(255,0,0,0.5), 0 0 100px rgba(255,0,0,0.2);
+    }
+
+    .closing-subtitle {
+      font-size: var(--fs-md);
+      color: #555;
+      margin: 0;
+      letter-spacing: 0.1em;
+    }
+
+    /* Horizontal rule */
+    .closing-rule {
+      width: 120px;
+      height: 2px;
+      background: linear-gradient(90deg, transparent, var(--red), transparent);
+      border: none;
+      margin: 0;
+      box-shadow: 0 0 10px rgba(255,0,0,0.4);
+    }
+
+    /* Speaker info row */
+    .closing-info-row {
+      display: flex;
+      align-items: center;
+      gap: 1.2rem;
+    }
+
+    .closing-name {
+      font-size: 1.2rem;
+      font-weight: 700;
+      color: var(--offwhite);
+    }
+
+    .closing-sep {
+      width: 1px; height: 20px;
+      background: var(--blood);
+    }
+
+    .closing-handle {
+      font-size: var(--fs-md);
+      color: var(--red);
+      text-shadow: 0 0 12px rgba(255,0,0,0.4);
+    }
+
+    .closing-role {
+      font-size: var(--fs-xs);
+      color: #3a3a3a;
+    }
+
+    /* Terminal prompt */
+    .closing-prompt {
+      font-size: var(--fs-sm);
+      color: #333;
+      margin-top: 0.5rem;
+    }
+    .closing-prompt .p-host { color: var(--crimson); }
+    .closing-prompt .p-path { color: var(--red); }
+    .closing-prompt .p-sep  { color: #222; }
+
+    /* Left vertical accent */
+    .closing-slide .closing-accent-l {
+      position: absolute;
+      left: 0; top: 10%; height: 80%; width: 4px;
+      background: linear-gradient(180deg, transparent, var(--red), var(--crimson), transparent);
+    }
+    /* Right vertical accent */
+    .closing-slide .closing-accent-r {
+      position: absolute;
+      right: 0; top: 10%; height: 80%; width: 4px;
+      background: linear-gradient(180deg, transparent, var(--crimson), var(--red), transparent);
+    }
+  </style>
+</head>
+<body>
+<div class="reveal">
+  <div class="slides">
+
+    <!-- ══════════════════════════════
+         SLIDE 1 · OPENING
+    ══════════════════════════════ -->
+    <section class="opening-slide">
+      <div class="noise" aria-hidden="true"></div>
+
+      <div class="boot-lines" aria-hidden="true"><span class="ok">[  OK  ]</span> Starting kernel audit subsystem...
+<span class="ok">[  OK  ]</span> Loaded target <span class="warn">pwn.target</span>
+<span class="ok">[  OK  ]</span> Session initialized — welcome, operator.</div>
+
+      <div class="t-box">
+        <div class="t-bar" aria-hidden="true">
+          <span class="dot dot-r"></span><span class="dot dot-y"></span><span class="dot dot-g"></span>
+          <span class="t-bar-label">sqlj3d1@kali:~ — bash — 132×38</span>
+        </div>
+        <div class="t-body">
+          <div>
+            <span class="t-prompt-host">sqlj3d1@kali</span><span class="t-prompt-sep">:</span><span class="t-prompt-path">~</span><span class="t-prompt-sep">$ </span><span class="t-prompt-cmd">./pwn_to_win.sh --year 2026</span>
+          </div>
+          <div class="op-big-title"><span class="pwn">Pwn</span><span class="rest"> to Win</span></div>
+          <div class="op-subtitle">An Insider's Guide to CTF 2026</div>
+          <div class="op-sep"></div>
+          <div class="op-meta">
+            <div class="op-meta-row"><span class="op-meta-key">speaker</span><span class="op-meta-val">Harraz</span></div>
+            <div class="op-meta-row"><span class="op-meta-key">handle</span><span class="op-meta-red">sqlj3d1</span></div>
+            <div class="op-meta-row"><span class="op-meta-key">date</span><span class="op-meta-dim">14 August 2026</span></div>
+          </div>
+          <div style="margin-top:1.6rem;">
+            <span class="t-prompt-host">sqlj3d1@kali</span><span class="t-prompt-sep">:</span><span class="t-prompt-path">~</span><span class="t-prompt-sep">$ </span><span class="cursor"></span>
+          </div>
+        </div>
+    </section>
+
+    <!-- ══════════════════════════════
+         SLIDE 2 · WHOAMI
+    ══════════════════════════════ -->
+    <section class="whoami-slide">
+      <div class="wh-left">
+        <div class="slide-header">
+          <div class="slide-cmd">./whoami</div>
+          <div class="slide-sub">Knowing who's talking tells you whether the advice is worth taking.</div>
+        </div>
+
+        <div class="wh-content">
+          <div class="wh-identity fragment fade-up">
+            <div class="wh-name-row">
+              <h2 class="wh-name">Harraz</h2>
+              <p class="wh-handle">sqlj3d1</p>
+            </div>
+            <p class="wh-role">Offensive Security Intern</p>
+            <p class="wh-uni">Universiti Utara Malaysia (UUM)</p>
+          </div>
+
+          <hr class="wh-rule" />
+
+          <div class="wh-cred-label fragment fade-up">Highlights</div>
+          <div class="wh-creds fragment fade-up">
+            <div class="wh-cred">
+              <span class="wh-pill gold">CHAMPION</span>
+              <span class="wh-cred-text">NERaCA 3.0 CTF 2025</span>
+            </div>
+            <div class="wh-cred">
+              <span class="wh-pill silver">4TH PLACE</span>
+              <span class="wh-cred-text">Astro-NACSA Coding Challenge 2024</span>
+            </div>
+            <div class="wh-cred">
+              <span class="wh-pill">TOP 10</span>
+              <span class="wh-cred-text">WargamesMY CTF 2024 — Student Category</span>
+            </div>
+            <div class="wh-cred">
+              <span class="wh-pill">SELECTED</span>
+              <span class="wh-cred-text">Malaysia Cybersecurity Camp 2024</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="meme-panel">
+        <img src="assets/chill-guy.png" alt="chill guy" />
+        <span class="meme-cap">#chillguy #genz</span>
+    </section>
+
+    <!-- ══════════════════════════════
+         SLIDE 3 · WHAT IS CTF
+    ══════════════════════════════ -->
+    <section class="hook-slide">
+      <div class="hk-left">
+        <div class="slide-header">
+          <div class="slide-cmd">./what_is_ctf</div>
+          <div class="slide-sub">Once you know what a CTF is, you'll wonder why you weren't playing already.</div>
+        </div>
+
+        <div class="hk-content">
+          <div class="hk-acronym fragment fade-right">
+            <div class="hk-letter-card"><span class="hk-letter">C</span><span class="hk-letter-word">Capture</span></div>
+            <div class="hk-letter-sep">—</div>
+            <div class="hk-letter-card"><span class="hk-letter">T</span><span class="hk-letter-word">The</span></div>
+            <div class="hk-letter-sep">—</div>
+            <div class="hk-letter-card"><span class="hk-letter">F</span><span class="hk-letter-word">Flag</span></div>
+          </div>
+
+          <div class="hk-definition fragment fade-up">
+            <div class="hk-def-label">What is CTF?</div>
+            <p class="hk-def-text">
+              A hacking competition where you solve challenges to find a hidden string called a <em>flag</em>.
+              Capture it. Submit it. Get the points.
+            </p>
+          </div>
+
+          <div class="hk-flag-section fragment fade-up">
+            <div class="hk-flag-label">What a flag looks like</div>
+            <div class="hk-flags-row">
+
+              <div class="hk-flag-col">
+                <div class="hk-flag-col-label">Structure</div>
+                <div class="hk-flag-box">
+                  <span class="hk-flag-header">CTF</span><span class="hk-flag-brace">{</span><span class="hk-flag-body">th1s_1s_4_fl4g</span><span class="hk-flag-close">}</span>
+                </div>
+                <div class="hk-flag-ann-row">
+                  <div class="hk-ann-item"><div class="hk-ann-tick"></div><span>flag header — <em>identifies the competition</em></span></div>
+                  <div class="hk-ann-item hk-ann-body-item"><div class="hk-ann-tick"></div><span>flag body — <em>your actual answer</em></span></div>
+                </div>
+              </div>
+
+              <div class="hk-flag-col">
+                <div class="hk-flag-col-label">Real example</div>
+                <div class="hk-flag-box hk-flag-box-example">
+                  <span class="hk-flag-header">usas</span><span class="hk-flag-brace">{</span><span class="hk-flag-body">w3b_eXpl01t4tIoN</span><span class="hk-flag-close">}</span>
+                </div>
+                <div class="hk-flag-ann-row">
+                  <div class="hk-ann-item"><div class="hk-ann-tick"></div><span>flag header — <em>usas</em></span></div>
+                  <div class="hk-ann-item hk-ann-body-item"><div class="hk-ann-tick"></div><span>flag body — <em>w3b_eXpl01t4tIoN</em></span></div>
+                </div>
+              </div>
+
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="meme-panel">
+        <img src="assets/heker.jpg" alt="heker meme" />
+        <span class="meme-cap">"i got a flag"<br/>— every CTF player ever</span>
+    </section>
+
+    <!-- ══════════════════════════════
+         SLIDE 4 · FORMATS
+    ══════════════════════════════ -->
+    <section class="formats-slide">
+
+      <div class="slide-header">
+        <div class="slide-cmd">./ctf_formats</div>
+        <div class="slide-sub">Knowing the format before you register stops you from showing up to the wrong fight.</div>
+      </div>
+
+      <div class="fmt-strip">
+
+        <!-- Jeopardy (highlighted) -->
+        <div class="fmt-item highlight fragment grow">
+          <div class="fmt-diamond">
+            <span class="fmt-diamond-inner">🏆</span>
+          </div>
+          <div class="fmt-text">
+            <span class="fmt-badge">MOST COMMON</span>
+            <span class="fmt-name">Jeopardy</span>
+            <span class="fmt-desc">Categorised challenges. Solve them, submit the flag, earn points.</span>
+          </div>
+        </div>
+
+        <div class="fmt-line"></div>
+
+        <!-- Attack & Defense -->
+        <div class="fmt-item fragment grow">
+          <div class="fmt-diamond">
+            <span class="fmt-diamond-inner">⚔️</span>
+          </div>
+          <div class="fmt-text">
+            <span class="fmt-name">Attack &amp; Defense</span>
+            <span class="fmt-desc">Own a live system. Attack others, defend yours. Breach or be breached.</span>
+          </div>
+        </div>
+
+        <div class="fmt-line"></div>
+
+        <!-- Physical -->
+        <div class="fmt-item fragment grow">
+          <div class="fmt-diamond">
+            <span class="fmt-diamond-inner">🔓</span>
+          </div>
+          <div class="fmt-text">
+            <span class="fmt-name">Physical</span>
+            <span class="fmt-desc">Real hardware — lock picking, device manipulation, physical security bypasses.</span>
+          </div>
+        </div>
+
+        <div class="fmt-line"></div>
+
+        <!-- Time-Attack -->
+        <div class="fmt-item fragment grow">
+          <div class="fmt-diamond">
+            <span class="fmt-diamond-inner">⏱️</span>
+          </div>
+          <div class="fmt-text">
+            <span class="fmt-name">Time-Attack</span>
+            <span class="fmt-desc">Solve as many challenges as possible before the clock hits zero.</span>
+          </div>
+        </div>
+
+    </section>
+
+    <!-- ══════════════════════════════
+         SLIDE 5 · CATEGORIES
+    ══════════════════════════════ -->
+    <section class="categories-slide">
+
+      <div class="slide-header">
+        <div class="slide-cmd">./jeopardy_categories</div>
+        <div class="slide-sub">Every category is a different discipline — pick your lane, then expand from there.</div>
+      </div>
+
+      <div class="cat-grid fragment fade-up">
+
+        <div class="cat-card">
+          <div class="cat-name">Web Exploitation</div>
+          <p class="cat-desc">Find and exploit vulnerabilities in web apps — SQLi, XSS, IDOR, and more.</p>
+        </div>
+
+        <div class="cat-card">
+          <div class="cat-name">Forensics</div>
+          <p class="cat-desc">Analyse files, memory dumps, and network captures to recover hidden data.</p>
+        </div>
+
+        <div class="cat-card">
+          <div class="cat-name">Reverse Engineering</div>
+          <p class="cat-desc">Decompile and analyse binaries or obfuscated code to understand what they do.</p>
+        </div>
+
+        <div class="cat-card">
+          <div class="cat-name">Binary Exploitation / Pwn</div>
+          <p class="cat-desc">Exploit memory vulnerabilities in compiled binaries — buffer overflows, ROP chains.</p>
+        </div>
+
+        <div class="cat-card">
+          <div class="cat-name">Cryptography</div>
+          <p class="cat-desc">Break weak encryption, decode ciphers, and attack flawed crypto implementations.</p>
+        </div>
+
+        <div class="cat-card">
+          <div class="cat-name">Steganography</div>
+          <p class="cat-desc">Find hidden data concealed inside images, audio, or other media files.</p>
+        </div>
+
+        <div class="cat-card">
+          <div class="cat-name">OSINT</div>
+          <p class="cat-desc">Use open-source intelligence to track down people, places, or information online.</p>
+        </div>
+
+        <div class="cat-card">
+          <div class="cat-name">Boot2Root</div>
+          <p class="cat-desc">Compromise a full machine from zero — enumerate, exploit, escalate, own root.</p>
+        </div>
+
+        <div class="cat-card">
+          <div class="cat-name">Miscellaneous</div>
+          <p class="cat-desc">Anything that doesn't fit a box — trivia, scripting, logic puzzles, and wildcards.</p>
+        </div>
+
+        <div class="cat-card new-cat">
+          <span class="cat-new-badge">EMERGING</span>
+          <div class="cat-name">Blockchain</div>
+          <p class="cat-desc">Exploit smart contract vulnerabilities and weaknesses in decentralised protocols.</p>
+        </div>
+
+        <div class="cat-card new-cat">
+          <span class="cat-new-badge">EMERGING</span>
+          <div class="cat-name">Cloud Security</div>
+          <p class="cat-desc">Exploit misconfigured cloud services — S3 buckets, IAM roles, container escapes.</p>
+        </div>
+
+        <div class="cat-card new-cat">
+          <span class="cat-new-badge">EMERGING</span>
+          <div class="cat-name">AI Security</div>
+          <p class="cat-desc">Attack and defend AI models — prompt injection, model extraction, adversarial inputs.</p>
+        </div>
+
+    </section>
+
+    <!-- ══════════════════════════════
+         SLIDE 6 · SCORING
+    ══════════════════════════════ -->
+    <section class="scoring-slide">
+
+      <div class="sc-left">
+        <div class="slide-header">
+          <div class="slide-cmd">./scoring_format</div>
+          <div class="slide-sub">Knowing how points work changes how you prioritise challenges during the competition.</div>
+        </div>
+
+        <div class="sc-cards fragment fade-left">
+
+          <div class="sc-card">
+            <div class="sc-icon">📋</div>
+            <div class="sc-body">
+              <div class="sc-title">Static Scoring</div>
+              <p class="sc-desc">Each challenge has a fixed point value that never changes. Every team that solves it gets the same points — no advantage for solving early.</p>
+            </div>
+          </div>
+
+          <div class="sc-card highlight">
+            <div class="sc-icon">📉</div>
+            <div class="sc-body">
+              <div class="sc-title">Dynamic / Decaying Scoring</div>
+              <p class="sc-desc">Challenges start at max points. Each time a team submits the correct flag, the value drops for everyone. Solve early = more points. Most modern CTFs use this.</p>
+            </div>
+          </div>
+
+          <div class="sc-card">
+            <div class="sc-icon">⚔️</div>
+            <div class="sc-body">
+              <div class="sc-title">Attack & Defense Scoring</div>
+              <p class="sc-desc">Points awarded for successfully breaching opponents' systems. Points deducted if your own system gets compromised. Offense and defense run simultaneously.</p>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- Right: decay diagram -->
+      <div class="sc-right fragment fade-right">
+        <div class="sc-diagram-label">Point Decay</div>
+
+        <div class="sc-decay-chart">
+          <div class="sc-bar-group">
+            <div class="sc-bar" style="height:100%"></div>
+            <div class="sc-bar-label">1st solve</div>
+          </div>
+          <div class="sc-bar-group">
+            <div class="sc-bar" style="height:78%"></div>
+            <div class="sc-bar-label">2nd</div>
+          </div>
+          <div class="sc-bar-group">
+            <div class="sc-bar" style="height:60%"></div>
+            <div class="sc-bar-label">3rd</div>
+          </div>
+          <div class="sc-bar-group">
+            <div class="sc-bar" style="height:45%"></div>
+            <div class="sc-bar-label">4th</div>
+          </div>
+          <div class="sc-bar-group">
+            <div class="sc-bar" style="height:33%; opacity:0.6"></div>
+            <div class="sc-bar-label">5th+</div>
+          </div>
+        </div>
+
+        <div class="sc-decay-note">points drop with<br/>every new solve</div>
+
+        <div class="sc-firstblood">
+          <span class="sc-fb-icon">🩸</span>
+          <span class="sc-fb-text"><strong>First Blood</strong> — bonus awarded to the very first team to solve a challenge.</span>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- ══════════════════════════════
+         SLIDE 7 · WHERE TO START
+    ══════════════════════════════ -->
+    <section class="platforms-slide">
+        <div class="slide-header">
+          <div class="slide-cmd">./where_to_start</div>
+          <div class="slide-sub">These are the platforms and resources that will get you from zero to your first solve.</div>
+        </div>
+
+        <div class="platforms-meme fragment fade-up" style="order: 3;">
+          <img src="assets/wanna_start.jpg" alt="wanna start meme" />
+        </div>
+
+        <div class="platform-grid fragment fade-up" style="order: 1;">
+          <div class="platform-card">
+            <span class="platform-icon">🔵</span>
+            <div class="platform-info">
+              <span class="platform-name">Blue Team Labs Online</span>
+              <a class="platform-url" href="https://blueteamlabs.online" target="_blank">blueteamlabs.online</a>
+            </div>
+          </div>
+          <div class="platform-card">
+            <span class="platform-icon">⚔️</span>
+            <div class="platform-info">
+              <span class="platform-name">CyberWarFare Labs</span>
+              <a class="platform-url" href="https://cyberwarfare.live" target="_blank">cyberwarfare.live</a>
+            </div>
+          </div>
+          <div class="platform-card">
+            <span class="platform-icon">🛡️</span>
+            <div class="platform-info">
+              <span class="platform-name">CyLab Security Academy</span>
+              <a class="platform-url" href="https://cylabacademy.org" target="_blank">cylabacademy.org</a>
+            </div>
+          </div>
+          <div class="platform-card">
+            <span class="platform-icon">🔴</span>
+            <div class="platform-info">
+              <span class="platform-name">HackTheBox Academy</span>
+              <a class="platform-url" href="https://academy.hackthebox.com" target="_blank">academy.hackthebox.com</a>
+            </div>
+          </div>
+          <div class="platform-card">
+            <span class="platform-icon">🛡️</span>
+            <div class="platform-info">
+              <span class="platform-name">LetsDefend</span>
+              <a class="platform-url" href="https://letsdefend.io" target="_blank">letsdefend.io</a>
+            </div>
+          </div>
+          <div class="platform-card">
+            <span class="platform-icon">🟢</span>
+            <div class="platform-info">
+              <span class="platform-name">TryHackMe</span>
+              <a class="platform-url" href="https://tryhackme.com" target="_blank">tryhackme.com</a>
+            </div>
+          </div>
+        </div>
+
+        <div class="ctftime-card fragment fade-up" style="order: 2;">
+          <span class="ctftime-icon">📅</span>
+          <div class="ctftime-info">
+            <span class="ctftime-name">CTFtime</span>
+            <a class="ctftime-url" href="https://ctftime.org" target="_blank">ctftime.org</a>
+            <span class="ctftime-desc">Not a practice platform — find upcoming CTF competitions worldwide.</span>
+          </div>
+          <span class="ctftime-badge">FIND EVENTS</span>
+        </div>
+    </section>
+
+    <!-- ══════════════════════════════
+         SLIDE · LEVEL UP
+    ══════════════════════════════ -->
+    <section class="levelup-slide">
+
+      <div class="slide-header">
+        <div class="slide-cmd">./level_up</div>
+        <div class="slide-sub">Secrets that separate the ones who solve from the ones who dominate.</div>
+      </div>
+
+      <div class="lu-strip">
+
+        <div class="lu-item fragment fade-up">
+          <div class="lu-circle">🛠️</div>
+          <div class="lu-text">
+            <span class="lu-title">Weaponize the IDE</span>
+            <span class="lu-desc">Transform your code editor into a centralized attack hub for all tools and tasks.</span>
+          </div>
+        </div>
+
+        <div class="lu-item fragment fade-up">
+          <div class="lu-circle">🤖</div>
+          <div class="lu-text">
+            <span class="lu-title">AI Agents</span>
+            <span class="lu-desc">Leverage AI to rapidly analyze unfamiliar concepts instead of manual research.</span>
+          </div>
+        </div>
+
+        <div class="lu-item fragment fade-up">
+          <div class="lu-circle">🔗</div>
+          <div class="lu-text">
+            <span class="lu-title">Model Context Protocol</span>
+            <span class="lu-desc">Connect your environment to AI models for seamless live data analysis.</span>
+          </div>
+        </div>
+
+        <div class="lu-item fragment fade-up">
+          <div class="lu-circle">⚡</div>
+          <div class="lu-text">
+            <span class="lu-title">Script Your Workflow</span>
+            <span class="lu-desc">Automate repetitive tasks to drastically increase execution speed.</span>
+          </div>
+        </div>
+
+      </div>
+
+    </section>
+
+    <!-- ══════════════════════════════
+         SLIDE · DEMO TIME
+    ══════════════════════════════ -->
+    <section class="demo-slide">
+
+      <div class="slide-header">
+        <div class="slide-cmd">./demo_time</div>
+        <div class="slide-sub">Let's put theory into practice — time to break something.</div>
+      </div>
+
+      <!-- Big hype text -->
+      <div class="demo-hype fragment fade-up">
+        <span class="demo-hype-icon">💀</span>
+        <span class="demo-hype-text">LIVE CHALLENGE</span>
+      </div>
+
+      <div class="demo-card fragment fade-up">
+        <div class="demo-card-header">
+          <span class="demo-cat-badge">WEB EXPLOITATION</span>
+          <h3 class="demo-chall-name">SalaryVault <span style="color:#555; font-size:0.7em; font-weight:400;">(Easy)</span></h3>
+        </div>
+        <div class="demo-card-body">
+          <div class="demo-field">
+            <span class="demo-field-label">Description</span>
+            <span class="demo-field-value">SalaryVault is an internal compensation portal. Sometimes, what belongs to others is just a reference away. Can you access what you shouldn&rsquo;t?</span>
+          </div>
+          <div class="demo-field">
+            <span class="demo-field-label">Target</span>
+            <span class="demo-field-value"><a href="https://salary-vault.vercel.app" target="_blank">https://salary-vault.vercel.app</a></span>
+          </div>
+          <div class="demo-field">
+            <span class="demo-field-label">Flag Format</span>
+            <span class="demo-field-value" style="color:var(--red);">usas{}</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="demo-footer fragment fade-up">
+        <span class="demo-pulse"></span>
+        <span class="demo-footer-text">audience participation welcome</span>
+      </div>
+
+    </section>
+
+    <!-- ══════════════════════════════
+         SLIDE · ROADMAP
+    ══════════════════════════════ -->
+    <section class="reality-slide">
+
+      <div class="slide-header">
+        <div class="slide-cmd">./roadmap</div>
+        <div class="slide-sub">A step-by-step path from your first terminal to your first offer letter.</div>
+      </div>
+
+      <div class="roadmap-canvas">
+
+        <svg class="roadmap-svg" viewBox="0 0 1000 320" preserveAspectRatio="none" aria-hidden="true">
+          <defs>
+            <linearGradient id="roadGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%"   stop-color="#3D0000" />
+              <stop offset="35%"  stop-color="#950101" />
+              <stop offset="70%"  stop-color="#950101" />
+              <stop offset="100%" stop-color="#FF0000" />
+            </linearGradient>
+          </defs>
+          <path class="roadmap-glow"
+            d="M 95 215 C 140 215, 160 95, 240 95 C 320 95, 340 225, 410 225
+               C 480 225, 500 85, 575 85 C 650 85, 670 215, 740 215
+               C 800 215, 830 125, 900 125" />
+          <path class="roadmap-track roadmap-track-anim"
+            d="M 95 215 C 140 215, 160 95, 240 95 C 320 95, 340 225, 410 225
+               C 480 225, 500 85, 575 85 C 650 85, 670 215, 740 215
+               C 800 215, 830 125, 900 125" />
+        </svg>
+
+        <div class="roadmap-stop roadmap-stop--below roadmap-stop--1 fragment">
+          <div class="rm-node">
+            <div class="rm-ring"></div>
+            <div class="rm-hex"></div>
+            <span class="rm-step">01</span>
+          </div>
+          <div class="rm-label">
+            <span class="rm-title">Master Fundamentals</span>
+            <span class="rm-desc">Learn Linux, networking, and core security basics.</span>
+          </div>
+        </div>
+
+        <div class="roadmap-stop roadmap-stop--above roadmap-stop--2 fragment">
+          <div class="rm-node">
+            <div class="rm-ring"></div>
+            <div class="rm-hex"></div>
+            <span class="rm-step">02</span>
+          </div>
+          <div class="rm-label">
+            <span class="rm-title">Hands-On Practice</span>
+            <span class="rm-desc">Solve beginner labs on TryHackMe, HackTheBox Academy, etc.</span>
+          </div>
+        </div>
+
+        <div class="roadmap-stop roadmap-stop--below roadmap-stop--3 fragment">
+          <div class="rm-node">
+            <div class="rm-ring"></div>
+            <div class="rm-hex"></div>
+            <span class="rm-step">03</span>
+          </div>
+          <div class="rm-label">
+            <span class="rm-title">Squad Up</span>
+            <span class="rm-desc">Join a CTF team to learn and compete faster.</span>
+          </div>
+        </div>
+
+        <div class="roadmap-stop roadmap-stop--above roadmap-stop--4 fragment">
+          <div class="rm-node">
+            <div class="rm-ring"></div>
+            <div class="rm-hex"></div>
+            <span class="rm-step">04</span>
+          </div>
+          <div class="rm-label">
+            <span class="rm-title">Build &amp; Automate</span>
+            <span class="rm-desc">Write scripts to automate tasks or build custom tools.</span>
+          </div>
+        </div>
+
+        <div class="roadmap-stop roadmap-stop--below roadmap-stop--5 fragment">
+          <div class="rm-node">
+            <div class="rm-ring"></div>
+            <div class="rm-hex"></div>
+            <span class="rm-step">05</span>
+          </div>
+          <div class="rm-label">
+            <span class="rm-title">Document It</span>
+            <span class="rm-desc">Publish writeups and blogs to build a public portfolio.</span>
+          </div>
+        </div>
+
+        <div class="roadmap-stop roadmap-stop--above roadmap-stop--dest roadmap-stop--6 fragment">
+          <div class="rm-beacon">
+            <span class="rm-beacon-pulse"></span>
+            <span class="rm-beacon-pulse"></span>
+            <span class="rm-beacon-core">🏁</span>
+          </div>
+          <div class="rm-label">
+            <span class="rm-title">Land the Role</span>
+            <span class="rm-desc">Turn your practical experience into a cybersecurity career.</span>
+          </div>
+        </div>
+
+      </div>
+
+      <div class="roadmap-legend">
+        <span><i class="rm-legend-dot"></i> Milestone</span>
+        <span><i class="rm-legend-flag"></i> Career destination</span>
+      </div>
+
+    </section>
+
+    <!-- ══════════════════════════════
+         SLIDE · INDUSTRY READINESS
+    ══════════════════════════════ -->
+    <section class="industry-slide">
+
+      <div class="slide-header">
+        <div class="slide-cmd">./industry_readiness</div>
+        <div class="slide-sub">CTF proves you can hack — these skills prove you can do it professionally.</div>
+      </div>
+
+      <div class="ind-layout">
+        <!-- Meme on the right (appears first) -->
+        <div class="ind-meme fragment fade-up" style="grid-column:2; grid-row:1;">
+          <img src="assets/job_ready.jpg" alt="job ready meme" />
+        </div>
+
+        <div class="ind-stack" style="grid-column:1; grid-row:1;">
+
+          <div class="ind-bar fragment fade-left">
+            <div class="ind-bar-num">01</div>
+            <div class="ind-bar-content">
+              <div class="ind-bar-title">Structured Testing</div>
+              <p class="ind-bar-desc">Anchor assessments in recognized standards instead of random testing.<br/><em>OWASP WSTG · OWASP Top 10:2025 · API Security Risks 2023 · GenAI LLM Top 10 2026</em></p>
+            </div>
+          </div>
+
+          <div class="ind-bar fragment fade-left">
+            <div class="ind-bar-num">02</div>
+            <div class="ind-bar-content">
+              <div class="ind-bar-title">Business Impact</div>
+              <p class="ind-bar-desc">Translate complex technical vulnerabilities into clear, understandable risks for the organization.</p>
+            </div>
+          </div>
+
+          <div class="ind-bar fragment fade-left">
+            <div class="ind-bar-num">03</div>
+            <div class="ind-bar-content">
+              <div class="ind-bar-title">Clear Reporting</div>
+              <p class="ind-bar-desc">Write concise, reproducible reports that detail findings and required remediation steps.</p>
+            </div>
+          </div>
+
+          <div class="ind-bar fragment fade-left">
+            <div class="ind-bar-num">04</div>
+            <div class="ind-bar-content">
+              <div class="ind-bar-title">Soft Skills</div>
+              <p class="ind-bar-desc">Cultivate communication skills to collaborate with developers and ensure issues actually get fixed.</p>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+    </section>
+
+    <!-- ══════════════════════════════
+         SLIDE · CLOSING / THANK YOU
+    ══════════════════════════════ -->
+    <section class="closing-slide">
+
+      <div class="noise" aria-hidden="true"></div>
+      <div class="closing-accent-l" aria-hidden="true"></div>
+      <div class="closing-accent-r" aria-hidden="true"></div>
+
+      <h1 class="closing-title">
+        <span class="red">THANK</span> YOU
+      </h1>
+
+      <p class="closing-subtitle">questions? let's hack.</p>
+
+      <hr class="closing-rule" />
+
+      <div class="closing-info-row">
+        <span class="closing-name">Harraz</span>
+        <div class="closing-sep"></div>
+        <span class="closing-handle">sqlj3d1</span>
+        <div class="closing-sep"></div>
+        <span class="closing-role">Offensive Security Intern · UUM</span>
+      </div>
+
+      <div class="closing-prompt">
+        <span class="p-host">sqlj3d1@kali</span><span class="p-sep">:</span><span class="p-path">~</span><span class="p-sep">$ </span><span class="cursor"></span>
+      </div>
+
+    </section>
+
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/plugin/highlight/highlight.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/plugin/notes/notes.js"></script>
+<script>
+  Reveal.initialize({
+    hash: true,
+    slideNumber: false,
+    transition: 'fade',
+    transitionSpeed: 'default',
+    backgroundTransition: 'fade',
+    margin: 0,
+    plugins: [ RevealHighlight, RevealNotes ]
+  });
+</script>
+</body>
+</html>
